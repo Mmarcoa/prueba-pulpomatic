@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Pul</string>
+    <!--TODO: Debug key. Agregar Release key en Google API console -> Credentials. -->
+    <string name="google_maps_key">AIzaSyCmjJMvx-hwOLWCAbHixg35u_p6azSOpbA</string>
+</resources>
