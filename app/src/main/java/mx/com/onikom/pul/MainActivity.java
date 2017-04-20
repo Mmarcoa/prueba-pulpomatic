@@ -1,17 +1,24 @@
 package mx.com.onikom.pul;
 
+import android.app.Activity;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.transition.TransitionManager;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.transition.Fade;
+import android.support.v7.widget.CardView;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -74,11 +81,13 @@ import com.google.android.gms.maps.model.MarkerOptions;
 
 public class MainActivity extends AppCompatActivity
         implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener {
+        GoogleApiClient.OnConnectionFailedListener, View.OnClickListener {
 
     private static final String TAG = "MainActivity";
     private GoogleMap googleMap;
     private CameraPosition cameraPosition;
+//    private Context context;
+//    private Activity activity;
 
     // Punto de entrada a los servicios de Google Play
     private GoogleApiClient googleApiClient;
@@ -113,6 +122,9 @@ public class MainActivity extends AppCompatActivity
 
         // Retrieve the content view that renders the map.
         setContentView(R.layout.activity_main);
+
+//        context = this;
+//        activity = this;
 
         // Se agrega Google Places y Location.
         googleApiClient = new GoogleApiClient.Builder(this)
@@ -220,19 +232,52 @@ public class MainActivity extends AppCompatActivity
             }
         });
 
+//        final ViewGroup rootView = (ViewGroup) findViewById(R.id.mainLayout);
+
+//        final ImageView marker = (ImageView) findViewById(R.id.marker);
         Button fixPositionButton = (Button) findViewById(R.id.fix_position_button);
-        fixPositionButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                LatLng centerPosition = googleMap.getCameraPosition().target;
-                Log.d(TAG, "Latitud: " + centerPosition.latitude);
-                Log.d(TAG, "Longitud: " + centerPosition.longitude);
-
-                googleMap.addMarker(new MarkerOptions().position(centerPosition));
-
-                // TODO: 19/04/17 Visibilidad de botón y de marcador GONE al fijar el punto
-            }
-        });
+        fixPositionButton.setOnClickListener(this);
+//                new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                LatLng centerPosition = googleMap.getCameraPosition().target;
+//                Log.d(TAG, "Latitud: " + centerPosition.latitude);
+//                Log.d(TAG, "Longitud: " + centerPosition.longitude);
+//
+//                googleMap.addMarker(new MarkerOptions().position(centerPosition));
+//
+//                fixPositionButton.setOnClickListener(null);
+//
+//                ImageView marker = (ImageView) findViewById(R.id.marker);
+//                CardView searchView = (CardView) findViewById(R.id.search_form);
+//                CardView resetView = (CardView) findViewById(R.id.reset_cardview);
+//                CardView infoView = (CardView) findViewById(R.id.info_cardview);
+//
+//
+//                Fade fade  = new Fade(Fade.OUT);
+//                // Start recording changes to the view hierarchy
+//                TransitionManager.beginDelayedTransition(rootView, fade);
+//
+//                // Quita el botón con animación
+//                rootView.removeView(fixPositionButton);
+//                rootView.removeView(marker);
+////                fixPositionButton.setVisibility(View.GONE);
+////                marker.setVisibility(View.GONE);
+//                rootView.removeView(searchView);
+//
+//                rootView.removeView(resetView);
+//                rootView.removeView(infoView);
+//
+//                resetView.setVisibility(View.VISIBLE);
+//                infoView.setVisibility(View.VISIBLE);
+//
+//                rootView.addView(resetView);
+//                rootView.addView(infoView);
+//
+//                resetView.setOnClickListener(activity);
+//
+//            }
+//        });
 
         setAutocompleteFragment();
 
@@ -241,6 +286,57 @@ public class MainActivity extends AppCompatActivity
 
         // Get the current location of the device and set the position of the map.
         getDeviceLocation();
+    }
+
+    @Override
+    public void onClick(View v) {
+        switch (v.getId()) {
+            case R.id.fix_position_button:
+
+                ViewGroup rootView = (ViewGroup) findViewById(R.id.mainLayout);
+                Button fixPositionButton = (Button) findViewById(R.id.fix_position_button);
+
+                LatLng centerPosition = googleMap.getCameraPosition().target;
+                Log.d(TAG, "Latitud: " + centerPosition.latitude);
+                Log.d(TAG, "Longitud: " + centerPosition.longitude);
+
+                googleMap.addMarker(new MarkerOptions().position(centerPosition));
+
+                fixPositionButton.setOnClickListener(null);
+
+                ImageView marker = (ImageView) findViewById(R.id.marker);
+                CardView searchView = (CardView) findViewById(R.id.search_form);
+                CardView resetView = (CardView) findViewById(R.id.reset_cardview);
+                CardView infoView = (CardView) findViewById(R.id.info_cardview);
+
+
+                Fade fade  = new Fade(Fade.OUT);
+                // Start recording changes to the view hierarchy
+                TransitionManager.beginDelayedTransition(rootView, fade);
+
+                // Quita el botón con animación
+                rootView.removeView(fixPositionButton);
+                rootView.removeView(marker);
+//                fixPositionButton.setVisibility(View.GONE);
+//                marker.setVisibility(View.GONE);
+                rootView.removeView(searchView);
+
+                rootView.removeView(resetView);
+                rootView.removeView(infoView);
+
+                resetView.setVisibility(View.VISIBLE);
+                infoView.setVisibility(View.VISIBLE);
+
+                rootView.addView(resetView);
+                rootView.addView(infoView);
+
+                resetView.setOnClickListener(this);
+
+                break;
+            case R.id.reset_cardview:
+                Log.d(TAG, "Reiniciar selección");
+                break;
+        }
     }
 
     /**
