@@ -1,7 +1,5 @@
 package mx.com.onikom.pul;
 
-import android.app.Activity;
-import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.support.annotation.NonNull;
@@ -9,6 +7,7 @@ import android.support.annotation.Nullable;
 import android.support.transition.TransitionManager;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.support.v4.view.ViewCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.transition.Fade;
@@ -29,15 +28,18 @@ import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.Places;
 import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment;
 import com.google.android.gms.location.places.ui.PlaceSelectionListener;
-import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.CameraPosition;
+import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+
+import mx.com.onikom.pul.helpers.Constants;
 
 /**
  El objeto de la aplicación será seleccionar un punto dentro de un mapa (punto objetivo)
@@ -86,8 +88,6 @@ public class MainActivity extends AppCompatActivity
     private static final String TAG = "MainActivity";
     private GoogleMap googleMap;
     private CameraPosition cameraPosition;
-//    private Context context;
-//    private Activity activity;
 
     // Punto de entrada a los servicios de Google Play
     private GoogleApiClient googleApiClient;
@@ -95,7 +95,7 @@ public class MainActivity extends AppCompatActivity
     // A default location and default zoom to use when location permission is
     // not granted.
     private final LatLng defaultLocation = new LatLng(19.4237049,-99.163055);
-    private static final int DEFAULT_ZOOM = 15;
+    private static final int DEFAULT_ZOOM = 16;
     private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
     private boolean locationPermissionGranted;
 
@@ -107,12 +107,22 @@ public class MainActivity extends AppCompatActivity
     private static final String KEY_CAMERA_POSITION = "camera_position";
     private static final String KEY_LOCATION = "location";
 
-    // Búsqueda de lugar autocompletado.
-    private PlaceAutocompleteFragment autocompleteFragment;
+    private ViewGroup rootView;
+    private Button fixPositionButton;
+    private ImageView marker;
+    private CardView searchView;
+    private CardView resetView;
+    private CardView infoView;
+
+    private static final int IN_POINT = 10;
+    private static final int VERY_CLOSE = 50;
+    private static final int CLOSE = 100;
+    private static final int FAR = 200;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d(TAG, "OnCreate");
 
         // Retrieve location and camera position from saved instance state.
         if (savedInstanceState != null) {
@@ -123,8 +133,12 @@ public class MainActivity extends AppCompatActivity
         // Retrieve the content view that renders the map.
         setContentView(R.layout.activity_main);
 
-//        context = this;
-//        activity = this;
+        rootView = (ViewGroup) findViewById(R.id.mainLayout);
+        fixPositionButton = (Button) findViewById(R.id.fix_position_button);
+        marker = (ImageView) findViewById(R.id.marker);
+        searchView = (CardView) findViewById(R.id.search_form);
+        resetView = (CardView) findViewById(R.id.reset_cardview);
+        infoView = (CardView) findViewById(R.id.info_cardview);
 
         // Se agrega Google Places y Location.
         googleApiClient = new GoogleApiClient.Builder(this)
@@ -146,6 +160,15 @@ public class MainActivity extends AppCompatActivity
             outState.putParcelable(KEY_CAMERA_POSITION, googleMap.getCameraPosition());
             outState.putParcelable(KEY_LOCATION, lastKnownLocation);
             super.onSaveInstanceState(outState);
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (ViewCompat.isAttachedToWindow(resetView)) {
+            resetUI();
+        } else {
+            super.onBackPressed();
         }
     }
 
@@ -232,52 +255,7 @@ public class MainActivity extends AppCompatActivity
             }
         });
 
-//        final ViewGroup rootView = (ViewGroup) findViewById(R.id.mainLayout);
-
-//        final ImageView marker = (ImageView) findViewById(R.id.marker);
-        Button fixPositionButton = (Button) findViewById(R.id.fix_position_button);
         fixPositionButton.setOnClickListener(this);
-//                new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                LatLng centerPosition = googleMap.getCameraPosition().target;
-//                Log.d(TAG, "Latitud: " + centerPosition.latitude);
-//                Log.d(TAG, "Longitud: " + centerPosition.longitude);
-//
-//                googleMap.addMarker(new MarkerOptions().position(centerPosition));
-//
-//                fixPositionButton.setOnClickListener(null);
-//
-//                ImageView marker = (ImageView) findViewById(R.id.marker);
-//                CardView searchView = (CardView) findViewById(R.id.search_form);
-//                CardView resetView = (CardView) findViewById(R.id.reset_cardview);
-//                CardView infoView = (CardView) findViewById(R.id.info_cardview);
-//
-//
-//                Fade fade  = new Fade(Fade.OUT);
-//                // Start recording changes to the view hierarchy
-//                TransitionManager.beginDelayedTransition(rootView, fade);
-//
-//                // Quita el botón con animación
-//                rootView.removeView(fixPositionButton);
-//                rootView.removeView(marker);
-////                fixPositionButton.setVisibility(View.GONE);
-////                marker.setVisibility(View.GONE);
-//                rootView.removeView(searchView);
-//
-//                rootView.removeView(resetView);
-//                rootView.removeView(infoView);
-//
-//                resetView.setVisibility(View.VISIBLE);
-//                infoView.setVisibility(View.VISIBLE);
-//
-//                rootView.addView(resetView);
-//                rootView.addView(infoView);
-//
-//                resetView.setOnClickListener(activity);
-//
-//            }
-//        });
 
         setAutocompleteFragment();
 
@@ -290,51 +268,21 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onClick(View v) {
+
+        Fade fade  = new Fade(Fade.OUT);
+        // Start recording changes to the view hierarchy
+        TransitionManager.beginDelayedTransition(rootView, fade);
+
         switch (v.getId()) {
+
             case R.id.fix_position_button:
 
-                ViewGroup rootView = (ViewGroup) findViewById(R.id.mainLayout);
-                Button fixPositionButton = (Button) findViewById(R.id.fix_position_button);
-
-                LatLng centerPosition = googleMap.getCameraPosition().target;
-                Log.d(TAG, "Latitud: " + centerPosition.latitude);
-                Log.d(TAG, "Longitud: " + centerPosition.longitude);
-
-                googleMap.addMarker(new MarkerOptions().position(centerPosition));
-
-                fixPositionButton.setOnClickListener(null);
-
-                ImageView marker = (ImageView) findViewById(R.id.marker);
-                CardView searchView = (CardView) findViewById(R.id.search_form);
-                CardView resetView = (CardView) findViewById(R.id.reset_cardview);
-                CardView infoView = (CardView) findViewById(R.id.info_cardview);
-
-
-                Fade fade  = new Fade(Fade.OUT);
-                // Start recording changes to the view hierarchy
-                TransitionManager.beginDelayedTransition(rootView, fade);
-
-                // Quita el botón con animación
-                rootView.removeView(fixPositionButton);
-                rootView.removeView(marker);
-//                fixPositionButton.setVisibility(View.GONE);
-//                marker.setVisibility(View.GONE);
-                rootView.removeView(searchView);
-
-                rootView.removeView(resetView);
-                rootView.removeView(infoView);
-
-                resetView.setVisibility(View.VISIBLE);
-                infoView.setVisibility(View.VISIBLE);
-
-                rootView.addView(resetView);
-                rootView.addView(infoView);
-
-                resetView.setOnClickListener(this);
-
+                updateMarkerFixedUI();
                 break;
+
             case R.id.reset_cardview:
-                Log.d(TAG, "Reiniciar selección");
+
+                resetUI();
                 break;
         }
     }
@@ -354,7 +302,7 @@ public class MainActivity extends AppCompatActivity
         }
 
         if (locationPermissionGranted) {
-            autocompleteFragment = (PlaceAutocompleteFragment)
+            PlaceAutocompleteFragment autocompleteFragment = (PlaceAutocompleteFragment)
                     getFragmentManager().findFragmentById(R.id.place_autocomplete_fragment);
 
             autocompleteFragment.setHint(getResources().getString(R.string.select_point));
@@ -438,7 +386,7 @@ public class MainActivity extends AppCompatActivity
         if (cameraPosition != null) {
             googleMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
         } else if (lastKnownLocation != null) {
-            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
+            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(
                     new LatLng(lastKnownLocation.getLatitude(),
                             lastKnownLocation.getLongitude()), DEFAULT_ZOOM));
         } else {
@@ -446,5 +394,79 @@ public class MainActivity extends AppCompatActivity
             googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(defaultLocation, DEFAULT_ZOOM));
             googleMap.getUiSettings().setMyLocationButtonEnabled(false);
         }
+    }
+
+    /**
+     * Actualiza UI, coloca marcador y oculta vistas para fijar posición, muestra vista de información
+     * y botón para reiniciar selección
+     */
+    private void updateMarkerFixedUI() {
+        LatLng centerPosition = googleMap.getCameraPosition().target;
+        Log.d(TAG, "Latitud: " + centerPosition.latitude);
+        Log.d(TAG, "Longitud: " + centerPosition.longitude);
+
+        // Quita el botón con animación
+        rootView.removeView(fixPositionButton);
+        rootView.removeView(marker);
+        rootView.removeView(searchView);
+
+        rootView.removeView(resetView);
+        rootView.removeView(infoView);
+
+        resetView.setVisibility(View.VISIBLE);
+        infoView.setVisibility(View.VISIBLE);
+
+        rootView.addView(resetView);
+        rootView.addView(infoView);
+
+        // Instantiates a new CircleOptions object and defines the center and radius
+        CircleOptions circle10m = new CircleOptions()
+                .strokeColor(Constants.BLUE)
+                .fillColor(Constants.BLUE_10M)
+                .center(centerPosition)
+                .radius(IN_POINT); // In meters
+        CircleOptions circle50m = new CircleOptions()
+                .strokeColor(Constants.BLUE_10M)
+                .fillColor(Constants.BLUE_50M)
+                .center(centerPosition)
+                .radius(VERY_CLOSE); // In meters
+        CircleOptions circle100m = new CircleOptions()
+                .strokeColor(Constants.BLUE_50M)
+                .fillColor(Constants.BLUE_100M)
+                .center(centerPosition)
+                .radius(CLOSE); // In meters
+        CircleOptions circle200m = new CircleOptions()
+                .strokeColor(Constants.BLUE_100M)
+                .fillColor(Constants.BLUE_200M)
+                .center(centerPosition)
+                .radius(FAR); // In meters
+
+        // Get back the mutable Circle
+        Circle circle = googleMap.addCircle(circle10m);
+        googleMap.addCircle(circle50m);
+        googleMap.addCircle(circle100m);
+        googleMap.addCircle(circle200m);
+        googleMap.addMarker(new MarkerOptions().position(centerPosition));
+
+        resetView.setOnClickListener(this);
+    }
+
+    /**
+     * Se reinica la selección de punto objetivo, remueve marcador y círculos
+     * se mueve la cámara a la posición del dispositivo.
+     */
+    private void resetUI() {
+        Log.d(TAG, "Reiniciar selección");
+
+        rootView.removeView(resetView);
+        rootView.removeView(infoView);
+
+        rootView.addView(fixPositionButton);
+        rootView.addView(marker);
+        rootView.addView(searchView);
+
+        googleMap.clear();
+
+        getDeviceLocation();
     }
 }
