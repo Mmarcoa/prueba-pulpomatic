@@ -1,30 +1,28 @@
 package mx.com.onikom.pul;
 
-import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.PendingResult;
-import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.places.PlaceLikelihood;
-import com.google.android.gms.location.places.PlaceLikelihoodBuffer;
+import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.Places;
+import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment;
+import com.google.android.gms.location.places.ui.PlaceSelectionListener;
+import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -100,12 +98,8 @@ public class MainActivity extends AppCompatActivity
     private static final String KEY_CAMERA_POSITION = "camera_position";
     private static final String KEY_LOCATION = "location";
 
-    // Selección del lugar actual
-    private final int mMaxEntries = 5;
-    private String[] mLikelyPlaceNames = new String[mMaxEntries];
-    private String[] mLikelyPlaceAddresses = new String[mMaxEntries];
-    private String[] mLikelyPlaceAttributions = new String[mMaxEntries];
-    private LatLng[] mLikelyPlaceLatLngs = new LatLng[mMaxEntries];
+    // Búsqueda de lugar autocompletado.
+    private PlaceAutocompleteFragment autocompleteFragment;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -144,104 +138,6 @@ public class MainActivity extends AppCompatActivity
     }
 
     /**
-     * Gets the current location of the device, and positions the map's camera.
-     */
-    private void getDeviceLocation() {
-        /*
-         * Request location permission, so that we can get the location of the
-         * device. The result of the permission request is handled by a callback,
-         * onRequestPermissionsResult.
-         */
-        if (ContextCompat.checkSelfPermission(this.getApplicationContext(),
-                android.Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
-            locationPermissionGranted = true;
-        } else {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
-                    PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
-        }
-        /*
-         * Get the best and most recent location of the device, which may be null in rare
-         * cases when a location is not available.
-         */
-        if (locationPermissionGranted) {
-            lastKnownLocation = LocationServices.FusedLocationApi
-                    .getLastLocation(googleApiClient);
-        }
-
-        // Set the map's camera position to the current location of the device.
-        if (cameraPosition != null) {
-            googleMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
-        } else if (lastKnownLocation != null) {
-            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
-                    new LatLng(lastKnownLocation.getLatitude(),
-                            lastKnownLocation.getLongitude()), DEFAULT_ZOOM));
-        } else {
-            Log.d(TAG, "Current location is null. Using defaults.");
-            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(defaultLocation, DEFAULT_ZOOM));
-            googleMap.getUiSettings().setMyLocationButtonEnabled(false);
-        }
-    }
-
-    /**
-     * Sets up the options menu.
-     * @param menu The options menu.
-     * @return Boolean.
-     */
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.current_place_menu, menu);
-        return true;
-    }
-
-    /**
-     * Handles a click on the menu option to get a place.
-     * @param item The menu item to handle.
-     * @return Boolean.
-     */
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.option_get_place) {
-            showCurrentPlace();
-        }
-        return true;
-    }
-
-    /**
-     * Updates the map's UI settings based on whether the user has granted location permission.
-     */
-    private void updateLocationUI() {
-        if (googleMap == null) {
-            return;
-        }
-
-    /*
-     * Request location permission, so that we can get the location of the
-     * device. The result of the permission request is handled by a callback,
-     * onRequestPermissionsResult.
-     */
-        if (ContextCompat.checkSelfPermission(this.getApplicationContext(),
-                android.Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
-            locationPermissionGranted = true;
-        } else {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
-                    PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
-        }
-
-        if (locationPermissionGranted) {
-            googleMap.setMyLocationEnabled(true);
-            googleMap.getUiSettings().setMyLocationButtonEnabled(true);
-        } else {
-            googleMap.setMyLocationEnabled(false);
-            googleMap.getUiSettings().setMyLocationButtonEnabled(false);
-            lastKnownLocation = null;
-        }
-    }
-
-    /**
      * Handles the result of the request for location permissions.
      */
     @Override
@@ -259,6 +155,8 @@ public class MainActivity extends AppCompatActivity
             }
         }
         updateLocationUI();
+        // FIXME: 18/04/17 Pide permiso y no regresa a la actividad. Desinstalar app para probar
+        Log.d(TAG, "On request result.");
     }
 
     /**
@@ -322,6 +220,22 @@ public class MainActivity extends AppCompatActivity
             }
         });
 
+        Button fixPositionButton = (Button) findViewById(R.id.fix_position_button);
+        fixPositionButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                LatLng centerPosition = googleMap.getCameraPosition().target;
+                Log.d(TAG, "Latitud: " + centerPosition.latitude);
+                Log.d(TAG, "Longitud: " + centerPosition.longitude);
+
+                googleMap.addMarker(new MarkerOptions().position(centerPosition));
+
+                // TODO: 19/04/17 Visibilidad de botón y de marcador GONE al fijar el punto
+            }
+        });
+
+        setAutocompleteFragment();
+
         // Turn on the My Location layer and the related control on the map.
         updateLocationUI();
 
@@ -330,90 +244,111 @@ public class MainActivity extends AppCompatActivity
     }
 
     /**
-     * Prompts the user to select the current place from a list of likely places, and shows the
-     * current place on the map - provided the user has granted location permission.
+     * Se añade un 'listener' al PlaceAutocompleteFragment
      */
-    private void showCurrentPlace() {
-        if (googleMap == null) {
-            return;
+    private void setAutocompleteFragment() {
+        if (ContextCompat.checkSelfPermission(this.getApplicationContext(),
+                android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+            locationPermissionGranted = true;
+        } else {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
+                    PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
         }
 
         if (locationPermissionGranted) {
-            // Get the likely places - that is, the businesses and other points of interest that
-            // are the best match for the device's current location.
-            @SuppressWarnings("MissingPermission")
-            PendingResult<PlaceLikelihoodBuffer> result = Places.PlaceDetectionApi
-                    .getCurrentPlace(googleApiClient, null);
-            result.setResultCallback(new ResultCallback<PlaceLikelihoodBuffer>() {
+            autocompleteFragment = (PlaceAutocompleteFragment)
+                    getFragmentManager().findFragmentById(R.id.place_autocomplete_fragment);
+
+            autocompleteFragment.setHint(getResources().getString(R.string.select_point));
+
+            autocompleteFragment.setOnPlaceSelectedListener(new PlaceSelectionListener() {
                 @Override
-                public void onResult(@NonNull PlaceLikelihoodBuffer likelyPlaces) {
-                    int i = 0;
-                    mLikelyPlaceNames = new String[mMaxEntries];
-                    mLikelyPlaceAddresses = new String[mMaxEntries];
-                    mLikelyPlaceAttributions = new String[mMaxEntries];
-                    mLikelyPlaceLatLngs = new LatLng[mMaxEntries];
-                    for (PlaceLikelihood placeLikelihood : likelyPlaces) {
-                        // Build a list of likely places to show the user. Max 5.
-                        mLikelyPlaceNames[i] = (String) placeLikelihood.getPlace().getName();
-                        mLikelyPlaceAddresses[i] = (String) placeLikelihood.getPlace().getAddress();
-                        mLikelyPlaceAttributions[i] = (String) placeLikelihood.getPlace()
-                                .getAttributions();
-                        mLikelyPlaceLatLngs[i] = placeLikelihood.getPlace().getLatLng();
+                public void onPlaceSelected(Place place) {
+                    Log.d(TAG, "Place: " + place.getName());
+                    googleMap.animateCamera(CameraUpdateFactory.newLatLng(place.getLatLng()));
+                }
 
-                        i++;
-                        if (i > (mMaxEntries - 1)) {
-                            break;
-                        }
-                    }
-                    // Release the place likelihood buffer, to avoid memory leaks.
-                    likelyPlaces.release();
-
-                    // Show a dialog offering the user the list of likely places, and add a
-                    // marker at the selected place.
-                    openPlacesDialog();
+                @Override
+                public void onError(Status status) {
+                    Log.d(TAG, "Ocurrió un error: " + status);
                 }
             });
-        } else {
-            // Add a default marker, because the user hasn't selected a place.
-            googleMap.addMarker(new MarkerOptions()
-                    .title(getString(R.string.default_info_title))
-                    .position(defaultLocation)
-                    .snippet(getString(R.string.default_info_snippet)));
         }
     }
 
     /**
-     * Displays a form allowing the user to select a place from a list of likely places.
+     * Updates the map's UI settings based on whether the user has granted location permission.
      */
-    private void openPlacesDialog() {
-        // Ask the user to choose the place where they are now.
-        DialogInterface.OnClickListener listener =
-                new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        // The "which" argument contains the position of the selected item.
-                        LatLng markerLatLng = mLikelyPlaceLatLngs[which];
-                        String markerSnippet = mLikelyPlaceAddresses[which];
-                        if (mLikelyPlaceAttributions[which] != null) {
-                            markerSnippet = markerSnippet + "\n" + mLikelyPlaceAttributions[which];
-                        }
-                        // Add a marker for the selected place, with an info window
-                        // showing information about that place.
-                        googleMap.addMarker(new MarkerOptions()
-                                .title(mLikelyPlaceNames[which])
-                                .position(markerLatLng)
-                                .snippet(markerSnippet));
+    private void updateLocationUI() {
+        if (googleMap == null) {
+            return;
+        }
 
-                        // Position the map's camera at the location of the marker.
-                        googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(markerLatLng,
-                                DEFAULT_ZOOM));
-                    }
-                };
+    /*
+     * Request location permission, so that we can get the location of the
+     * device. The result of the permission request is handled by a callback,
+     * onRequestPermissionsResult.
+     */
+        if (ContextCompat.checkSelfPermission(this.getApplicationContext(),
+                android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+            locationPermissionGranted = true;
+        } else {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
+                    PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
+        }
 
-        // Display the dialog.
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(R.string.pick_place)
-                .setItems(mLikelyPlaceNames, listener)
-                .show();
+        if (locationPermissionGranted) {
+            googleMap.setMyLocationEnabled(true);
+            googleMap.getUiSettings().setMyLocationButtonEnabled(true);
+        } else {
+            googleMap.setMyLocationEnabled(false);
+            googleMap.getUiSettings().setMyLocationButtonEnabled(false);
+            lastKnownLocation = null;
+        }
+    }
+
+    /**
+     * Gets the current location of the device, and positions the map's camera.
+     */
+    private void getDeviceLocation() {
+        /*
+         * Request location permission, so that we can get the location of the
+         * device. The result of the permission request is handled by a callback,
+         * onRequestPermissionsResult.
+         */
+        if (ContextCompat.checkSelfPermission(this.getApplicationContext(),
+                android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+            locationPermissionGranted = true;
+        } else {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
+                    PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
+        }
+        /*
+         * Get the best and most recent location of the device, which may be null in rare
+         * cases when a location is not available.
+         */
+        if (locationPermissionGranted) {
+            lastKnownLocation = LocationServices.FusedLocationApi
+                    .getLastLocation(googleApiClient);
+        }
+
+        // Set the map's camera position to the current location of the device.
+        if (cameraPosition != null) {
+            googleMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+        } else if (lastKnownLocation != null) {
+            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
+                    new LatLng(lastKnownLocation.getLatitude(),
+                            lastKnownLocation.getLongitude()), DEFAULT_ZOOM));
+        } else {
+            Log.d(TAG, "Current location is null. Using defaults.");
+            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(defaultLocation, DEFAULT_ZOOM));
+            googleMap.getUiSettings().setMyLocationButtonEnabled(false);
+        }
     }
 }

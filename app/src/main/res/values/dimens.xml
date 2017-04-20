@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--Tamaños-->
+    <dimen name="marker_height">35dp</dimen>
+    <dimen name="marker_width">35dp</dimen>
+
+    <!--Margenes-->
+    <dimen name="button_margin_bottom">20dp</dimen>
+    <dimen name="search_form_margin_top">60dp</dimen>
+    <dimen name="search_form_horizontal_margin">30dp</dimen>
+
+    <!--Padding-->
+    <dimen name="search_form_padding">5dp</dimen>
+</resources>
