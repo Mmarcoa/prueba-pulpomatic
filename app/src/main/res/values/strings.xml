@@ -4,7 +4,7 @@
     <string name="google_maps_key">AIzaSyCmjJMvx-hwOLWCAbHixg35u_p6azSOpbA</string>
     <string name="fix_marker">Fijar punto objetivo</string>
     <string name="select_point">Buscar punto objetivo</string>
-    <string name="distance">Distancia al punto objetivo: <b>%1$d</b> m</string>
+    <string name="distance">Distancia al punto objetivo: <b>%1$f</b> m</string>
     <string name="reset">REINICIAR</string>
 
     <string name="icon_reset_description">Reiniciar selección</string>

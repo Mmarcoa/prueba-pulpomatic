@@ -1,7 +1,9 @@
 package mx.com.onikom.pul;
 
+import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.transition.TransitionManager;
@@ -22,8 +24,15 @@ import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResult;
+import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.Places;
 import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment;
@@ -33,7 +42,6 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.CameraPosition;
-import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
@@ -83,7 +91,7 @@ import mx.com.onikom.pul.helpers.Constants;
 
 public class MainActivity extends AppCompatActivity
         implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener, View.OnClickListener {
+        GoogleApiClient.OnConnectionFailedListener, View.OnClickListener, LocationListener{
 
     private static final String TAG = "MainActivity";
     private GoogleMap googleMap;
@@ -113,11 +121,19 @@ public class MainActivity extends AppCompatActivity
     private CardView searchView;
     private CardView resetView;
     private CardView infoView;
+    private TextView distanceText;
+    private TextView messageText;
 
     private static final int IN_POINT = 10;
     private static final int VERY_CLOSE = 50;
     private static final int CLOSE = 100;
     private static final int FAR = 200;
+
+    private static final int REQUEST_CHECK_SETTINGS = 2;
+
+    private Marker objectivePointMarker;
+
+    private LocationRequest locationRequest;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -139,6 +155,8 @@ public class MainActivity extends AppCompatActivity
         searchView = (CardView) findViewById(R.id.search_form);
         resetView = (CardView) findViewById(R.id.reset_cardview);
         infoView = (CardView) findViewById(R.id.info_cardview);
+        distanceText = (TextView) findViewById(R.id.distance_text);
+        messageText = (TextView) findViewById(R.id.message);
 
         // Se agrega Google Places y Location.
         googleApiClient = new GoogleApiClient.Builder(this)
@@ -157,6 +175,7 @@ public class MainActivity extends AppCompatActivity
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         if (googleMap != null) {
+            // FIXME: 20/04/17 Guardar estado cuando ya se fijó marcador: marcador, círculos, etc.
             outState.putParcelable(KEY_CAMERA_POSITION, googleMap.getCameraPosition());
             outState.putParcelable(KEY_LOCATION, lastKnownLocation);
             super.onSaveInstanceState(outState);
@@ -257,13 +276,7 @@ public class MainActivity extends AppCompatActivity
 
         fixPositionButton.setOnClickListener(this);
 
-        setAutocompleteFragment();
-
-        // Turn on the My Location layer and the related control on the map.
-        updateLocationUI();
-
-        // Get the current location of the device and set the position of the map.
-        getDeviceLocation();
+        createLocationRequest();
     }
 
     @Override
@@ -284,6 +297,20 @@ public class MainActivity extends AppCompatActivity
 
                 resetUI();
                 break;
+        }
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+        Log.d(TAG, "Current location: " + location);
+        Log.d(TAG, "Provider: " + location.getProvider());
+        Location temp = new Location(LocationManager.GPS_PROVIDER);
+        if (objectivePointMarker != null) {
+            temp.setLatitude(objectivePointMarker.getPosition().latitude);
+            temp.setLongitude(objectivePointMarker.getPosition().longitude);
+            Log.d(TAG, "Distance to: " + location.distanceTo(temp));
+            distanceText.setText(String.format(getResources().getString(R.string.distance), location.distanceTo(temp)));
+            messageText.setText(location.getProvider());
         }
     }
 
@@ -401,9 +428,9 @@ public class MainActivity extends AppCompatActivity
      * y botón para reiniciar selección
      */
     private void updateMarkerFixedUI() {
-        LatLng centerPosition = googleMap.getCameraPosition().target;
-        Log.d(TAG, "Latitud: " + centerPosition.latitude);
-        Log.d(TAG, "Longitud: " + centerPosition.longitude);
+        LatLng markerPosition = googleMap.getCameraPosition().target;
+        Log.d(TAG, "Latitud: " + markerPosition.latitude);
+        Log.d(TAG, "Longitud: " + markerPosition.longitude);
 
         // Quita el botón con animación
         rootView.removeView(fixPositionButton);
@@ -423,31 +450,32 @@ public class MainActivity extends AppCompatActivity
         CircleOptions circle10m = new CircleOptions()
                 .strokeColor(Constants.BLUE)
                 .fillColor(Constants.BLUE_10M)
-                .center(centerPosition)
+                .center(markerPosition)
                 .radius(IN_POINT); // In meters
         CircleOptions circle50m = new CircleOptions()
                 .strokeColor(Constants.BLUE_10M)
                 .fillColor(Constants.BLUE_50M)
-                .center(centerPosition)
+                .center(markerPosition)
                 .radius(VERY_CLOSE); // In meters
         CircleOptions circle100m = new CircleOptions()
                 .strokeColor(Constants.BLUE_50M)
                 .fillColor(Constants.BLUE_100M)
-                .center(centerPosition)
+                .center(markerPosition)
                 .radius(CLOSE); // In meters
         CircleOptions circle200m = new CircleOptions()
                 .strokeColor(Constants.BLUE_100M)
                 .fillColor(Constants.BLUE_200M)
-                .center(centerPosition)
+                .center(markerPosition)
                 .radius(FAR); // In meters
 
         // Get back the mutable Circle
-        Circle circle = googleMap.addCircle(circle10m);
+        googleMap.addCircle(circle10m);
         googleMap.addCircle(circle50m);
         googleMap.addCircle(circle100m);
         googleMap.addCircle(circle200m);
-        googleMap.addMarker(new MarkerOptions().position(centerPosition));
+        objectivePointMarker = googleMap.addMarker(new MarkerOptions().position(markerPosition));
 
+        startLocationUpdates();
         resetView.setOnClickListener(this);
     }
 
@@ -467,6 +495,94 @@ public class MainActivity extends AppCompatActivity
 
         googleMap.clear();
 
+        // Detiene las actualizaciones de posición del dispositivo.
+        LocationServices.FusedLocationApi.removeLocationUpdates(googleApiClient, this);
+
         getDeviceLocation();
+    }
+
+
+    private void createLocationRequest() {
+        locationRequest = new LocationRequest();
+        locationRequest.setInterval(10000);
+        locationRequest.setFastestInterval(5000);
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+
+        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
+                .addLocationRequest(locationRequest);
+
+        PendingResult<LocationSettingsResult> result =
+                LocationServices.SettingsApi.checkLocationSettings(googleApiClient, builder.build());
+
+        result.setResultCallback(new ResultCallback<LocationSettingsResult>() {
+            @Override
+            public void onResult(@NonNull LocationSettingsResult locationSettingsResult) {
+                final Status status = locationSettingsResult.getStatus();
+//                final LocationSettingsStates settingsStates = locationSettingsResult.getLocationSettingsStates();
+                switch (status.getStatusCode()) {
+                    case LocationSettingsStatusCodes.SUCCESS:
+                        // All location settings are satisfied. The client can
+                        // initialize location requests here.
+                        Log.d(TAG, "Success");
+
+                        setAutocompleteFragment();
+
+                        // Turn on the My Location layer and the related control on the map.
+                        updateLocationUI();
+
+                        // Get the current location of the device and set the position of the map.
+                        getDeviceLocation();
+
+                        startLocationUpdates();
+
+                        break;
+                    case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
+                        // Location settings are not satisfied, but this can be fixed
+                        // by showing the user a dialog.
+                        Log.d(TAG, "Resolution required");
+                        try {
+                            // Show the dialog by calling startResolutionForResult(),
+                            // and check the result in onActivityResult().
+                            status.startResolutionForResult(
+                                    MainActivity.this,
+                                    REQUEST_CHECK_SETTINGS);
+                        } catch (IntentSender.SendIntentException e) {
+                            // Ignore the error.
+                        }
+                        break;
+                    case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
+                        // Location settings are not satisfied. However, we have no way
+                        // to fix the settings so we won't show the dialog.
+                        Log.d(TAG, "Settings unavailable");
+                        break;
+                }
+            }
+        });
+    }
+
+    private void startLocationUpdates() {
+        if (googleMap == null) {
+            return;
+        }
+
+    /*
+     * Request location permission, so that we can get the location of the
+     * device. The result of the permission request is handled by a callback,
+     * onRequestPermissionsResult.
+     */
+        if (ContextCompat.checkSelfPermission(this.getApplicationContext(),
+                android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+            locationPermissionGranted = true;
+        } else {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
+                    PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
+        }
+
+        if (locationPermissionGranted) {
+            LocationServices.FusedLocationApi.requestLocationUpdates(
+                    googleApiClient, locationRequest, this);
+        }
     }
 }
