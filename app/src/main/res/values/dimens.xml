@@ -4,12 +4,14 @@
     <dimen name="marker_height">35dp</dimen>
     <dimen name="marker_width">35dp</dimen>
     <dimen name="corner_radius">4dp</dimen>
-    <dimen name="icon_reset">50dp</dimen>
+    <dimen name="icon_reset">40dp</dimen>
+    <dimen name="icon_pin">40dp</dimen>
 
     <!--Margenes-->
     <dimen name="button_margin_top">20dp</dimen>
     <dimen name="search_form_margin_top">60dp</dimen>
     <dimen name="search_form_horizontal_margin">30dp</dimen>
+    <dimen name="fix_position_horizontal_margin">30dp</dimen>
     <dimen name="info_box_horizontal_spacing">10dp</dimen>
     <!--0,75 cm-->
     <dimen name="info_box_margin_bottom">47dp</dimen>
@@ -17,6 +19,7 @@
 
     <dimen name="reset_cardview_margintop">40dp</dimen>
     <dimen name="reset_box_vertical_spacing">5dp</dimen>
+    <dimen name="fix_box_horizontal_spacing">10dp</dimen>
 
     <!--Padding-->
     <dimen name="info_box_padding">8dp</dimen>

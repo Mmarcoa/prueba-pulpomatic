@@ -20,6 +20,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -116,10 +117,10 @@ public class MainActivity extends AppCompatActivity
     private static final String KEY_LOCATION = "location";
 
     private ViewGroup rootView;
-    private Button fixPositionButton;
+    private CardView fixPositionButton;
     private ImageView marker;
     private CardView searchView;
-    private CardView resetView;
+    private LinearLayout resetView;
     private CardView infoView;
     private TextView distanceText;
     private TextView messageText;
@@ -150,10 +151,10 @@ public class MainActivity extends AppCompatActivity
         setContentView(R.layout.activity_main);
 
         rootView = (ViewGroup) findViewById(R.id.mainLayout);
-        fixPositionButton = (Button) findViewById(R.id.fix_position_button);
+        fixPositionButton = (CardView) findViewById(R.id.fix_position_cardview);
         marker = (ImageView) findViewById(R.id.marker);
         searchView = (CardView) findViewById(R.id.search_form);
-        resetView = (CardView) findViewById(R.id.reset_cardview);
+        resetView = (LinearLayout) findViewById(R.id.reset_button);
         infoView = (CardView) findViewById(R.id.info_cardview);
         distanceText = (TextView) findViewById(R.id.distance_text);
         messageText = (TextView) findViewById(R.id.message);
@@ -288,12 +289,12 @@ public class MainActivity extends AppCompatActivity
 
         switch (v.getId()) {
 
-            case R.id.fix_position_button:
+            case R.id.fix_position_cardview:
 
                 updateMarkerFixedUI();
                 break;
 
-            case R.id.reset_cardview:
+            case R.id.reset_button:
 
                 resetUI();
                 break;
@@ -304,13 +305,25 @@ public class MainActivity extends AppCompatActivity
     public void onLocationChanged(Location location) {
         Log.d(TAG, "Current location: " + location);
         Log.d(TAG, "Provider: " + location.getProvider());
-        Location temp = new Location(LocationManager.GPS_PROVIDER);
+        Location markerLocation = new Location(LocationManager.GPS_PROVIDER);
         if (objectivePointMarker != null) {
-            temp.setLatitude(objectivePointMarker.getPosition().latitude);
-            temp.setLongitude(objectivePointMarker.getPosition().longitude);
-            Log.d(TAG, "Distance to: " + location.distanceTo(temp));
-            distanceText.setText(String.format(getResources().getString(R.string.distance), location.distanceTo(temp)));
-            messageText.setText(location.getProvider());
+            markerLocation.setLatitude(objectivePointMarker.getPosition().latitude);
+            markerLocation.setLongitude(objectivePointMarker.getPosition().longitude);
+            int distance = Math.round(location.distanceTo(markerLocation));
+            Log.d(TAG, "Distance to marker: " + distance);
+            distanceText.setText(String.format(getResources().getString(R.string.distance), distance));
+            String message = "";
+            if (distance > FAR)
+                message = getResources().getString(R.string.msg_far_away);
+            if (distance > CLOSE && distance <= FAR)
+                message = getResources().getString(R.string.msg_far);
+            if (distance > VERY_CLOSE && distance <= CLOSE)
+                message = getResources().getString(R.string.msg_close);
+            if (distance > IN_POINT && distance <= VERY_CLOSE)
+                message = getResources().getString(R.string.msg_very_close);
+            if (distance < IN_POINT)
+                message = getResources().getString(R.string.msg_at_target);
+            messageText.setText(message);
         }
     }
 
@@ -437,13 +450,13 @@ public class MainActivity extends AppCompatActivity
         rootView.removeView(marker);
         rootView.removeView(searchView);
 
-        rootView.removeView(resetView);
+//        rootView.removeView(resetView);
         rootView.removeView(infoView);
 
-        resetView.setVisibility(View.VISIBLE);
+//        resetView.setVisibility(View.VISIBLE);
         infoView.setVisibility(View.VISIBLE);
 
-        rootView.addView(resetView);
+//        rootView.addView(resetView);
         rootView.addView(infoView);
 
         // Instantiates a new CircleOptions object and defines the center and radius
@@ -486,7 +499,7 @@ public class MainActivity extends AppCompatActivity
     private void resetUI() {
         Log.d(TAG, "Reiniciar selección");
 
-        rootView.removeView(resetView);
+//        rootView.removeView(resetView);
         rootView.removeView(infoView);
 
         rootView.addView(fixPositionButton);

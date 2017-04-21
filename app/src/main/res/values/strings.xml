@@ -4,9 +4,15 @@
     <string name="google_maps_key">AIzaSyCmjJMvx-hwOLWCAbHixg35u_p6azSOpbA</string>
     <string name="fix_marker">Fijar punto objetivo</string>
     <string name="select_point">Buscar punto objetivo</string>
-    <string name="distance">Distancia al punto objetivo: <b>%1$f</b> m</string>
+    <string name="distance">Distancia al punto objetivo: <b>%1$d</b> m</string>
     <string name="reset">REINICIAR</string>
 
     <string name="icon_reset_description">Reiniciar selección</string>
+
+    <string name="msg_far_away">Estás muy lejos del punto objetivo</string>
+    <string name="msg_far">Estás lejos del punto objetivo</string>
+    <string name="msg_close">Estás próximo al punto objetivo</string>
+    <string name="msg_very_close">Estás muy próximo al punto objetivo</string>
+    <string name="msg_at_target">Estás en el punto objetivo</string>
 
 </resources>
