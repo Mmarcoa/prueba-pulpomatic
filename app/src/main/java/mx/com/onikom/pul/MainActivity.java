@@ -1,5 +1,6 @@
 package mx.com.onikom.pul;
 
+import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -17,7 +18,6 @@ import android.support.v7.widget.CardView;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -92,7 +92,7 @@ import mx.com.onikom.pul.helpers.Constants;
 
 public class MainActivity extends AppCompatActivity
         implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener, View.OnClickListener, LocationListener{
+        GoogleApiClient.OnConnectionFailedListener, View.OnClickListener, LocationListener {
 
     private static final String TAG = "MainActivity";
     private GoogleMap googleMap;
@@ -187,9 +187,32 @@ public class MainActivity extends AppCompatActivity
     public void onBackPressed() {
         if (ViewCompat.isAttachedToWindow(resetView)) {
             resetUI();
+            getDeviceLocation();
         } else {
             super.onBackPressed();
         }
+    }
+
+    @Override
+    protected void onStop() {
+        Log.d(TAG, "onStop");
+        Intent intent = new Intent(this, TransitionsIntentService.class);
+        Location location = new Location(LocationManager.GPS_PROVIDER);
+        location.setLatitude(objectivePointMarker.getPosition().latitude);
+        location.setLongitude(objectivePointMarker.getPosition().longitude);
+        intent.putExtra("position", location);
+        startService(intent);
+
+        super.onStop();
+    }
+
+    @Override
+    protected void onResume() {
+        Log.d(TAG, "onRestart");
+        Intent intent = new Intent(this, TransitionsIntentService.class);
+        stopService(intent);
+
+        super.onResume();
     }
 
     /**
@@ -292,19 +315,19 @@ public class MainActivity extends AppCompatActivity
             case R.id.fix_position_cardview:
 
                 updateMarkerFixedUI();
+                startLocationUpdates();
                 break;
 
             case R.id.reset_button:
 
                 resetUI();
+                getDeviceLocation();
                 break;
         }
     }
 
     @Override
     public void onLocationChanged(Location location) {
-        Log.d(TAG, "Current location: " + location);
-        Log.d(TAG, "Provider: " + location.getProvider());
         Location markerLocation = new Location(LocationManager.GPS_PROVIDER);
         if (objectivePointMarker != null) {
             markerLocation.setLatitude(objectivePointMarker.getPosition().latitude);
@@ -488,7 +511,6 @@ public class MainActivity extends AppCompatActivity
         googleMap.addCircle(circle200m);
         objectivePointMarker = googleMap.addMarker(new MarkerOptions().position(markerPosition));
 
-        startLocationUpdates();
         resetView.setOnClickListener(this);
     }
 
@@ -511,7 +533,6 @@ public class MainActivity extends AppCompatActivity
         // Detiene las actualizaciones de posición del dispositivo.
         LocationServices.FusedLocationApi.removeLocationUpdates(googleApiClient, this);
 
-        getDeviceLocation();
     }
 
 
