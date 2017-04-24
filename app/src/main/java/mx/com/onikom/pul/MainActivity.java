@@ -1,5 +1,7 @@
 package mx.com.onikom.pul;
 
+import android.Manifest;
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
@@ -9,6 +11,7 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.transition.TransitionManager;
@@ -57,9 +60,12 @@ import com.twitter.sdk.android.core.TwitterAuthConfig;
 import com.twitter.sdk.android.core.TwitterCore;
 import com.twitter.sdk.android.tweetcomposer.TweetComposer;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 
 import io.fabric.sdk.android.Fabric;
 import mx.com.onikom.pul.helpers.Constants;
@@ -124,6 +130,7 @@ public class MainActivity extends AppCompatActivity
     private final LatLng defaultLocation = new LatLng(19.4237049,-99.163055);
     private static final int DEFAULT_ZOOM = 16;
     private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
+    private static final int PERMISSIONS_REQUEST_WRITE_EXTERNAL = 3;
     private boolean locationPermissionGranted;
     private boolean isMarkerFixed;
     // The geographical location where the device is currently located. That is, the last-known
@@ -156,6 +163,9 @@ public class MainActivity extends AppCompatActivity
     private LocationRequest locationRequest;
 
     private Context context;
+    private Activity activity;
+
+    private Bitmap bitmap;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -174,6 +184,7 @@ public class MainActivity extends AppCompatActivity
         setContentView(R.layout.activity_main);
 
         context = this;
+        activity = this;
 
         rootView = (ViewGroup) findViewById(R.id.mainLayout);
         fixPositionButton = (CardView) findViewById(R.id.fix_position_cardview);
@@ -268,6 +279,12 @@ public class MainActivity extends AppCompatActivity
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     locationPermissionGranted = true;
+                }
+            }
+            case PERMISSIONS_REQUEST_WRITE_EXTERNAL: {
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    composeTweet();
                 }
             }
         }
@@ -382,7 +399,7 @@ public class MainActivity extends AppCompatActivity
                 message = getResources().getString(R.string.msg_close);
             if (actualDistance > IN_POINT && actualDistance <= VERY_CLOSE)
                 message = getResources().getString(R.string.msg_very_close);
-            if (actualDistance < IN_POINT) {
+            if (actualDistance <= IN_POINT) {
                 message = getResources().getString(R.string.msg_at_target);
                 if (lastDistance > IN_POINT) {
                     composeTweet();
@@ -674,20 +691,27 @@ public class MainActivity extends AppCompatActivity
         googleMap.snapshot(new GoogleMap.SnapshotReadyCallback() {
             @Override
             public void onSnapshotReady(Bitmap bitmap) {
-                try {
-                    FileOutputStream outputStream = new FileOutputStream(Environment.getExternalStorageDirectory().getPath() + "/map.png");
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 90, outputStream);
-                    File imageFile = new File(Environment.getExternalStorageDirectory().getPath() + "/map.png");
-                    Uri imageUri = Uri.fromFile(imageFile);
+                ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
+                int permissionCheck = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE);
 
+                if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(
+                            activity, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSIONS_REQUEST_WRITE_EXTERNAL);
+                } else {
+                    String path = MediaStore.Images.Media.insertImage(context.getContentResolver(), bitmap, "Imagen", null);
+                    Log.d(TAG, "Image path: " + path);
+                    Uri imageUri = Uri.parse(path);
+                    Log.d(TAG, "Image Uri: " + imageUri);
                     TweetComposer.Builder builder = new TweetComposer.Builder(context)
                             .text("El usuario está en el punto objetivo. Latitud: " + objectivePointMarker.getPosition().latitude + ", Longitud: " + objectivePointMarker.getPosition().longitude)
                             .image(imageUri)
                             ;
                     builder.show();
-                } catch (FileNotFoundException e) {
-                    Toast.makeText(context, "Error al guardar la imagen", Toast.LENGTH_SHORT).show();
                 }
+//                } catch (FileNotFoundException e) {
+//                    Toast.makeText(context, "Error al guardar la imagen", Toast.LENGTH_SHORT).show();
+//                }
             }
         });
     }
