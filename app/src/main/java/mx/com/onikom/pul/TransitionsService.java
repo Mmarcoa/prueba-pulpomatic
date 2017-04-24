@@ -6,8 +6,11 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.location.Location;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
 import android.support.v4.app.NotificationCompat;
@@ -20,6 +23,12 @@ import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.maps.GoogleMap;
+import com.twitter.sdk.android.tweetcomposer.TweetComposer;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 
 /**
  * Servicio para el cálculo de la distancia en segundo plano.
@@ -92,8 +101,10 @@ public class TransitionsService extends Service implements LocationListener, Goo
                 || (lastDistance <= 10 && actualDistance > 10)) {
             sendNotification(actualDistance);
             if (actualDistance <= 10) {
-                // TODO: 24/04/17 Agregar publicación de Tweet. 
-                Toast.makeText(this, "Publicando tweet.", Toast.LENGTH_SHORT).show();
+                // TODO: 24/04/17 Agregar publicación de Tweet.
+                TweetComposer.Builder builder = new TweetComposer.Builder(this)
+                        .text("El usuario está en el punto objetivo. Latitud: " + markerLocation.getLatitude() + ", Longitud: " + markerLocation.getLongitude());
+                builder.show();
             }
         }
 

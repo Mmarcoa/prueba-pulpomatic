@@ -1,10 +1,14 @@
 package mx.com.onikom.pul;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.Uri;
+import android.os.Environment;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.transition.TransitionManager;
@@ -49,6 +53,15 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
+import com.twitter.sdk.android.core.TwitterAuthConfig;
+import com.twitter.sdk.android.core.TwitterCore;
+import com.twitter.sdk.android.tweetcomposer.TweetComposer;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+
+import io.fabric.sdk.android.Fabric;
 import mx.com.onikom.pul.helpers.Constants;
 
 /**
@@ -95,6 +108,11 @@ public class MainActivity extends AppCompatActivity
         implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener, View.OnClickListener, LocationListener {
 
+    // Note: Your consumer key and secret should be obfuscated in your source code before shipping.
+    private static final String TWITTER_KEY = "U7upHGY6E2yL83gks3Cramztl";
+    private static final String TWITTER_SECRET = "GgzIgWsmPGzfl4i0AvACVW9L6SYayaMGlu4MoAFHgxGdDqytUK";
+
+
     private static final String TAG = "MainActivity";
 
     private GoogleMap googleMap;
@@ -132,13 +150,18 @@ public class MainActivity extends AppCompatActivity
     private static final int REQUEST_CHECK_SETTINGS = 2;
     // Marcador objetivo
     private Marker objectivePointMarker;
+    private int actualDistance;
     private int lastDistance;
 
     private LocationRequest locationRequest;
 
+    private Context context;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        TwitterAuthConfig authConfig = new TwitterAuthConfig(TWITTER_KEY, TWITTER_SECRET);
+        Fabric.with(this, new TwitterCore(authConfig), new TweetComposer());
         Log.d(TAG, "OnCreate");
 
         // Retrieve location and camera position from saved instance state.
@@ -149,6 +172,8 @@ public class MainActivity extends AppCompatActivity
 
         // Retrieve the content view that renders the map.
         setContentView(R.layout.activity_main);
+
+        context = this;
 
         rootView = (ViewGroup) findViewById(R.id.mainLayout);
         fixPositionButton = (CardView) findViewById(R.id.fix_position_cardview);
@@ -168,6 +193,7 @@ public class MainActivity extends AppCompatActivity
                 .addApi(Places.PLACE_DETECTION_API)
                 .build();
         googleApiClient.connect();
+        lastDistance = 1000;
     }
 
     /**
@@ -202,7 +228,7 @@ public class MainActivity extends AppCompatActivity
             location.setLatitude(objectivePointMarker.getPosition().latitude);
             location.setLongitude(objectivePointMarker.getPosition().longitude);
             intent.putExtra("position", location);
-            intent.putExtra("last_distance", lastDistance);
+            intent.putExtra("last_distance", actualDistance);
             startService(intent);
         }
 
@@ -344,21 +370,26 @@ public class MainActivity extends AppCompatActivity
         if (objectivePointMarker != null) {
             markerLocation.setLatitude(objectivePointMarker.getPosition().latitude);
             markerLocation.setLongitude(objectivePointMarker.getPosition().longitude);
-            lastDistance = Math.round(location.distanceTo(markerLocation));
-            Log.d(TAG, "Distance to marker: " + lastDistance);
-            distanceText.setText(String.format(getResources().getString(R.string.distance), lastDistance));
+            actualDistance = Math.round(location.distanceTo(markerLocation));
+            Log.d(TAG, "Distance to marker: " + actualDistance);
+            distanceText.setText(String.format(getResources().getString(R.string.distance), actualDistance));
             String message = "";
-            if (lastDistance > FAR)
+            if (actualDistance > FAR)
                 message = getResources().getString(R.string.msg_far_away);
-            if (lastDistance > CLOSE && lastDistance <= FAR)
+            if (actualDistance > CLOSE && actualDistance <= FAR)
                 message = getResources().getString(R.string.msg_far);
-            if (lastDistance > VERY_CLOSE && lastDistance <= CLOSE)
+            if (actualDistance > VERY_CLOSE && actualDistance <= CLOSE)
                 message = getResources().getString(R.string.msg_close);
-            if (lastDistance > IN_POINT && lastDistance <= VERY_CLOSE)
+            if (actualDistance > IN_POINT && actualDistance <= VERY_CLOSE)
                 message = getResources().getString(R.string.msg_very_close);
-            if (lastDistance < IN_POINT)
+            if (actualDistance < IN_POINT) {
                 message = getResources().getString(R.string.msg_at_target);
+                if (lastDistance > IN_POINT) {
+                    composeTweet();
+                }
+            }
             messageText.setText(message);
+            lastDistance = actualDistance;
         }
     }
 
@@ -637,5 +668,27 @@ public class MainActivity extends AppCompatActivity
             LocationServices.FusedLocationApi.requestLocationUpdates(
                     googleApiClient, locationRequest, this);
         }
+    }
+
+    private void composeTweet() {
+        googleMap.snapshot(new GoogleMap.SnapshotReadyCallback() {
+            @Override
+            public void onSnapshotReady(Bitmap bitmap) {
+                try {
+                    FileOutputStream outputStream = new FileOutputStream(Environment.getExternalStorageDirectory().getPath() + "/map.png");
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 90, outputStream);
+                    File imageFile = new File(Environment.getExternalStorageDirectory().getPath() + "/map.png");
+                    Uri imageUri = Uri.fromFile(imageFile);
+
+                    TweetComposer.Builder builder = new TweetComposer.Builder(context)
+                            .text("El usuario está en el punto objetivo. Latitud: " + objectivePointMarker.getPosition().latitude + ", Longitud: " + objectivePointMarker.getPosition().longitude)
+                            .image(imageUri)
+                            ;
+                    builder.show();
+                } catch (FileNotFoundException e) {
+                    Toast.makeText(context, "Error al guardar la imagen", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
     }
 }

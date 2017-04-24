@@ -3,6 +3,7 @@
     package="mx.com.onikom.pul">
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <application
         android:allowBackup="true"
@@ -28,6 +29,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <meta-data
+            android:name="io.fabric.ApiKey"
+            android:value="1d60498ee07b5190692a8e817b5d4c07f4658610" />
     </application>
 
+    <uses-permission android:name="android.permission.INTERNET" />
 </manifest>
