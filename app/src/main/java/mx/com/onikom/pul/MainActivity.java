@@ -22,6 +22,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -95,27 +96,25 @@ public class MainActivity extends AppCompatActivity
         GoogleApiClient.OnConnectionFailedListener, View.OnClickListener, LocationListener {
 
     private static final String TAG = "MainActivity";
+
     private GoogleMap googleMap;
     private CameraPosition cameraPosition;
-
     // Punto de entrada a los servicios de Google Play
     private GoogleApiClient googleApiClient;
-
     // A default location and default zoom to use when location permission is
     // not granted.
     private final LatLng defaultLocation = new LatLng(19.4237049,-99.163055);
     private static final int DEFAULT_ZOOM = 16;
     private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
     private boolean locationPermissionGranted;
-
+    private boolean isMarkerFixed;
     // The geographical location where the device is currently located. That is, the last-known
     // location retrieved by the Fused Location Provider.
     private Location lastKnownLocation;
-
     // Keys for storing activity state.
     private static final String KEY_CAMERA_POSITION = "camera_position";
     private static final String KEY_LOCATION = "location";
-
+    // Vistas
     private ViewGroup rootView;
     private CardView fixPositionButton;
     private ImageView marker;
@@ -124,15 +123,16 @@ public class MainActivity extends AppCompatActivity
     private CardView infoView;
     private TextView distanceText;
     private TextView messageText;
-
+    // Distancias de interés en metros.
     private static final int IN_POINT = 10;
     private static final int VERY_CLOSE = 50;
     private static final int CLOSE = 100;
     private static final int FAR = 200;
 
     private static final int REQUEST_CHECK_SETTINGS = 2;
-
+    // Marcador objetivo
     private Marker objectivePointMarker;
+    private int lastDistance;
 
     private LocationRequest locationRequest;
 
@@ -176,7 +176,6 @@ public class MainActivity extends AppCompatActivity
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         if (googleMap != null) {
-            // FIXME: 20/04/17 Guardar estado cuando ya se fijó marcador: marcador, círculos, etc.
             outState.putParcelable(KEY_CAMERA_POSITION, googleMap.getCameraPosition());
             outState.putParcelable(KEY_LOCATION, lastKnownLocation);
             super.onSaveInstanceState(outState);
@@ -185,7 +184,7 @@ public class MainActivity extends AppCompatActivity
 
     @Override
     public void onBackPressed() {
-        if (ViewCompat.isAttachedToWindow(resetView)) {
+        if (ViewCompat.isAttachedToWindow(resetView) && isMarkerFixed) {
             resetUI();
             getDeviceLocation();
         } else {
@@ -196,12 +195,16 @@ public class MainActivity extends AppCompatActivity
     @Override
     protected void onStop() {
         Log.d(TAG, "onStop");
-        Intent intent = new Intent(this, TransitionsIntentService.class);
-        Location location = new Location(LocationManager.GPS_PROVIDER);
-        location.setLatitude(objectivePointMarker.getPosition().latitude);
-        location.setLongitude(objectivePointMarker.getPosition().longitude);
-        intent.putExtra("position", location);
-        startService(intent);
+        // FIXME: 23/04/17 Enviar última distancia
+        if (isMarkerFixed) {
+            Intent intent = new Intent(this, TransitionsService.class);
+            Location location = new Location(LocationManager.GPS_PROVIDER);
+            location.setLatitude(objectivePointMarker.getPosition().latitude);
+            location.setLongitude(objectivePointMarker.getPosition().longitude);
+            intent.putExtra("position", location);
+            intent.putExtra("last_distance", lastDistance);
+            startService(intent);
+        }
 
         super.onStop();
     }
@@ -209,10 +212,20 @@ public class MainActivity extends AppCompatActivity
     @Override
     protected void onResume() {
         Log.d(TAG, "onRestart");
-        Intent intent = new Intent(this, TransitionsIntentService.class);
+        Intent intent = new Intent(this, TransitionsService.class);
         stopService(intent);
 
         super.onResume();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQUEST_CHECK_SETTINGS && resultCode == MainActivity.RESULT_OK) {
+            Log.d(TAG, "ActivityResult OK");
+            createLocationRequest();
+        } else if (resultCode != RESULT_OK) {
+            Toast.makeText(this, "La aplicación no funcionará correctamente sin los permisos de localización.", Toast.LENGTH_SHORT).show();
+        }
     }
 
     /**
@@ -233,7 +246,6 @@ public class MainActivity extends AppCompatActivity
             }
         }
         updateLocationUI();
-        // FIXME: 18/04/17 Pide permiso y no regresa a la actividad. Desinstalar app para probar
         Log.d(TAG, "On request result.");
     }
 
@@ -332,19 +344,19 @@ public class MainActivity extends AppCompatActivity
         if (objectivePointMarker != null) {
             markerLocation.setLatitude(objectivePointMarker.getPosition().latitude);
             markerLocation.setLongitude(objectivePointMarker.getPosition().longitude);
-            int distance = Math.round(location.distanceTo(markerLocation));
-            Log.d(TAG, "Distance to marker: " + distance);
-            distanceText.setText(String.format(getResources().getString(R.string.distance), distance));
+            lastDistance = Math.round(location.distanceTo(markerLocation));
+            Log.d(TAG, "Distance to marker: " + lastDistance);
+            distanceText.setText(String.format(getResources().getString(R.string.distance), lastDistance));
             String message = "";
-            if (distance > FAR)
+            if (lastDistance > FAR)
                 message = getResources().getString(R.string.msg_far_away);
-            if (distance > CLOSE && distance <= FAR)
+            if (lastDistance > CLOSE && lastDistance <= FAR)
                 message = getResources().getString(R.string.msg_far);
-            if (distance > VERY_CLOSE && distance <= CLOSE)
+            if (lastDistance > VERY_CLOSE && lastDistance <= CLOSE)
                 message = getResources().getString(R.string.msg_close);
-            if (distance > IN_POINT && distance <= VERY_CLOSE)
+            if (lastDistance > IN_POINT && lastDistance <= VERY_CLOSE)
                 message = getResources().getString(R.string.msg_very_close);
-            if (distance < IN_POINT)
+            if (lastDistance < IN_POINT)
                 message = getResources().getString(R.string.msg_at_target);
             messageText.setText(message);
         }
@@ -402,10 +414,12 @@ public class MainActivity extends AppCompatActivity
                 android.Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
             locationPermissionGranted = true;
+            Log.d(TAG, "Permission granted");
         } else {
             ActivityCompat.requestPermissions(this,
                     new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
                     PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
+            Log.d(TAG, "Permission no granted");
         }
 
         if (locationPermissionGranted) {
@@ -511,6 +525,8 @@ public class MainActivity extends AppCompatActivity
         googleMap.addCircle(circle200m);
         objectivePointMarker = googleMap.addMarker(new MarkerOptions().position(markerPosition));
 
+        isMarkerFixed = true;
+
         resetView.setOnClickListener(this);
     }
 
@@ -529,6 +545,8 @@ public class MainActivity extends AppCompatActivity
         rootView.addView(searchView);
 
         googleMap.clear();
+
+        isMarkerFixed = false;
 
         // Detiene las actualizaciones de posición del dispositivo.
         LocationServices.FusedLocationApi.removeLocationUpdates(googleApiClient, this);
@@ -567,7 +585,7 @@ public class MainActivity extends AppCompatActivity
                         // Get the current location of the device and set the position of the map.
                         getDeviceLocation();
 
-                        startLocationUpdates();
+                        //startLocationUpdates();
 
                         break;
                     case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
@@ -582,6 +600,7 @@ public class MainActivity extends AppCompatActivity
                                     REQUEST_CHECK_SETTINGS);
                         } catch (IntentSender.SendIntentException e) {
                             // Ignore the error.
+                            Log.d(TAG, "Send intent exception: " + e);
                         }
                         break;
                     case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:

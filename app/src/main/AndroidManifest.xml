@@ -18,9 +18,10 @@
             android:value="@string/google_maps_key" />
 
         <!--Servicio para cálculo en segundo plano.-->
-        <service android:name=".TransitionsIntentService" />
+        <service android:name=".TransitionsService" />
         
-        <activity android:name=".MainActivity">
+        <activity android:name=".MainActivity"
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
